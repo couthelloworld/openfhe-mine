@@ -42,6 +42,10 @@
 #include "utils/exception.h"
 #include "utils/inttypes.h"
 
+
+#include "utils/FHETracer.h"
+
+
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -283,6 +287,9 @@ PolyImpl<VecType> PolyImpl<VecType>::Negate() const {
 
 template <typename VecType>
 PolyImpl<VecType>& PolyImpl<VecType>::operator+=(const PolyImpl& element) {
+    uint32_t N = m_params->GetRingDimension();
+    TraceTimer timer("CORE", "MATH", "EWMA", N, 1);
+
     if (!m_values)
         m_values = std::make_unique<VecType>(m_params->GetRingDimension(), m_params->GetModulus());
     m_values->ModAddEq(*element.m_values);
@@ -291,6 +298,9 @@ PolyImpl<VecType>& PolyImpl<VecType>::operator+=(const PolyImpl& element) {
 
 template <typename VecType>
 PolyImpl<VecType>& PolyImpl<VecType>::operator-=(const PolyImpl& element) {
+    uint32_t N = m_params->GetRingDimension();
+    TraceTimer timer("CORE", "MATH", "EWMA", N, 1);
+
     if (!m_values)
         m_values = std::make_unique<VecType>(m_params->GetRingDimension(), m_params->GetModulus());
     m_values->ModSubEq(*element.m_values);

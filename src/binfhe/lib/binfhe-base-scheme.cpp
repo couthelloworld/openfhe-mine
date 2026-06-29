@@ -33,6 +33,10 @@
 
 #include <string>
 
+
+#include "utils/FHETracer.h"
+
+
 namespace lbcrypto {
 
 // wrapper for KeyGen methods
@@ -109,16 +113,27 @@ LWECiphertext BinFHEScheme::EvalBinGate(const std::shared_ptr<BinFHECryptoParams
     // the accumulator result is encrypted w.r.t. the transposed secret key
     // we can transpose "a" to get an encryption under the original secret key
     auto accVec{BootstrapGateCore(params, gate, EK.BSkey, cct1)->GetElements()};
-    accVec[0] = accVec[0].Transpose();
-    accVec[0].SetFormat(Format::COEFFICIENT);
-    accVec[1].SetFormat(Format::COEFFICIENT);
 
-    // hardcoded for p = 4
-    // we add Q/8 to "b" to map back to Q/4 (i.e., mod 2) arithmetic.
-    NativeInteger b{(Q >> 3) + 1};
-    b.ModAddFastEq(accVec[1][0], Q);
+    std::shared_ptr<LWECiphertextImpl> ctExt;
 
-    auto ctExt = std::make_shared<LWECiphertextImpl>(std::move(accVec[0].GetValues()), b);
+    {
+        // 啟動 Extract 計時器
+        uint32_t N = LWEParams->GetN();
+        TraceTimer timer("TFHE", "MATH", "Extract", N, 1);
+
+        // 轉置並萃取係數
+        accVec[0] = accVec[0].Transpose();
+        accVec[0].SetFormat(Format::COEFFICIENT);
+        accVec[1].SetFormat(Format::COEFFICIENT);
+
+        // b 的宣告與計算放在這裡面沒問題
+        NativeInteger b{(Q >> 3) + 1};
+        b.ModAddFastEq(accVec[1][0], Q);
+
+        // 在計時器結束前，把萃取出來的資料組裝好交給外面的 ctExt
+        ctExt = std::make_shared<LWECiphertextImpl>(std::move(accVec[0].GetValues()), b);
+        
+    } // 👈 Extract 計時器在這裡完美結束，不會算到後面 REDC 的時間！
 
     if (extended)
         return ctExt;
@@ -632,17 +647,32 @@ LWECiphertext BinFHEScheme::BootstrapFunc(const std::shared_ptr<BinFHECryptoPara
     // the accumulator result is encrypted w.r.t. the transposed secret key
     // we can transpose "a" to get an encryption under the original secret key
     auto accVec{BootstrapFuncCore(params, EK.BSkey, ct, f, fmod)->GetElements()};
-    accVec[0] = accVec[0].Transpose();
-    accVec[0].SetFormat(Format::COEFFICIENT);
-    accVec[1].SetFormat(Format::COEFFICIENT);
+    
 
-    auto ctExt = std::make_shared<LWECiphertextImpl>(std::move(accVec[0].GetValues()), accVec[1][0]);
+    std::shared_ptr<LWECiphertextImpl> ctExt;
+    {
+        uint32_t N = accVec[0].GetRingDimension(); // 通常是 1024 或 2048
+        TraceTimer timer("TFHE", "MACRO", "Extract", N, 1);
+        accVec[0] = accVec[0].Transpose();
+        accVec[0].SetFormat(Format::COEFFICIENT);
+        accVec[1].SetFormat(Format::COEFFICIENT);
+        // 原本的程式碼：提取出 LWE
+        ctExt = std::make_shared<LWECiphertextImpl>(std::move(accVec[0].GetValues()), accVec[1][0]);
+    }
 
     auto& LWEParams = params->GetLWEParams();
     // Modulus switching to a middle step Q'
     auto ctMS = LWEscheme->ModSwitch(LWEParams->GetqKS(), ctExt);
     // Key switching
-    auto ctKS = LWEscheme->KeySwitch(LWEParams, EK.KSkey, ctMS);
+    std::shared_ptr<LWECiphertextImpl> ctKS;
+    {
+        // 抓取 LWE 的維度 (通常是 500~800 左右)
+        uint32_t lwe_dim = ctMS->GetA().GetLength(); 
+        TraceTimer timer("TFHE", "MACRO", "REDC", lwe_dim, 1);
+        
+        // 原本的程式碼：執行 LWE Key Switching
+        ctKS = LWEscheme->KeySwitch(LWEParams, EK.KSkey, ctMS);
+    }
     // Modulus switching
     return LWEscheme->ModSwitch(fmod, ctKS);
 }

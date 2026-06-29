@@ -47,6 +47,10 @@
 #include "utils/exception.h"
 #include "utils/inttypes.h"
 
+
+#include "utils/FHETracer.h"
+
+
 #include <functional>
 #include <limits>
 #include <memory>
@@ -252,6 +256,9 @@ public:
     }
 
     PolyImpl Times(const PolyImpl& rhs) const override {
+        uint32_t N = m_params->GetRingDimension();
+        TraceTimer timer("CORE", "MATH", "EWMM", N, 1);
+
         if (m_params->GetRingDimension() != rhs.m_params->GetRingDimension())
             OPENFHE_THROW("RingDimension missmatch");
         if (m_params->GetModulus() != rhs.m_params->GetModulus())
@@ -263,11 +270,17 @@ public:
         return tmp;
     }
     PolyImpl TimesNoCheck(const PolyImpl& rhs) const {
+        uint32_t N = m_params->GetRingDimension();
+        TraceTimer timer("CORE", "MATH", "EWMM", N, 1);
+
         auto tmp(*this);
         tmp.m_values->ModMulNoCheckEq(*rhs.m_values);
         return tmp;
     }
     PolyImpl& operator*=(const PolyImpl& rhs) override {
+        uint32_t N = m_params->GetRingDimension();
+        TraceTimer timer("CORE", "MATH", "EWMM", N, 1);
+
         if (m_params->GetRingDimension() != rhs.m_params->GetRingDimension())
             OPENFHE_THROW("RingDimension missmatch");
         if (m_params->GetModulus() != rhs.m_params->GetModulus())

@@ -30,7 +30,7 @@
 //==================================================================================
 
 #include "rgsw-acc-cggi.h"
-
+#include "utils/FHETracer.h"
 #include <string>
 
 namespace lbcrypto {
@@ -58,6 +58,10 @@ RingGSWACCKey RingGSWAccumulatorCGGI::KeyGenAcc(const std::shared_ptr<RingGSWCry
 
 void RingGSWAccumulatorCGGI::EvalAcc(const std::shared_ptr<RingGSWCryptoParams>& params, ConstRingGSWACCKey& ek,
                                      RLWECiphertext& acc, const NativeVector& a) const {
+    
+    uint32_t N = acc->GetElements()[0].GetRingDimension();
+    TraceTimer timer("TFHE", "MATH", "blindRotate", N, 1);//for blind rotation, not operation.
+    
     size_t n{a.GetLength()};
     auto mod{a.GetModulus()};
     auto MbyMod{NativeInteger(2 * params->GetN()) / mod};
@@ -109,7 +113,17 @@ void RingGSWAccumulatorCGGI::AddToAccCGGI(const std::shared_ptr<RingGSWCryptoPar
     uint32_t digitsG2{(params->GetDigitsG() - 1) << 1};
     std::vector<NativePoly> dct(digitsG2, NativePoly(params->GetPolyParams(), Format::COEFFICIENT, true));
 
-    SignedDigitDecompose(params, ct, dct);
+    {
+        // 取得多項式維度 N (通常是 1024)
+        uint32_t N = ct[0].GetRingDimension(); 
+        
+        // 啟動計時器 (名為 Decomp)
+        TraceTimer timer("TFHE", "MATH", "Decomp", N, 1);
+        
+        // 原本 OpenFHE 的分解操作
+        SignedDigitDecompose(params, ct, dct);
+        
+    }
 
 #pragma omp parallel for num_threads(OpenFHEParallelControls.GetThreadLimit(digitsG2))
     for (uint32_t i = 0; i < digitsG2; ++i)

@@ -35,6 +35,9 @@
 #include "math/discreteuniformgenerator.h"
 #include "math/ternaryuniformgenerator.h"
 
+#include "utils/FHETracer.h"
+
+
 namespace lbcrypto {
 // the main rounding operation used in ModSwitch (as described in Section 3 of
 // https://eprint.iacr.org/2014/816) The idea is that Round(x) = 0.5 + Floor(x)
@@ -360,6 +363,8 @@ LWECiphertext LWEEncryptionScheme::KeySwitch(const std::shared_ptr<LWECryptoPara
         auto& refB = K->GetElementsB()[i];
         NativeInteger::Integer atmp(ctQN->GetA(i).ConvertToInt());
         for (size_t j = 0; j < digitCount; ++j) {
+            
+            TraceTimer timer("TFHE", "MATH", "REDC", n, 1);
             const auto a0 = (atmp % baseKS);
             atmp /= baseKS;
             b.ModSubFastEq(refB[a0][j], Q);

@@ -34,6 +34,8 @@
  */
 
 #include "binfhecontext.h"
+#include "utils/FHETracer.h"
+#define ENABLE_UFC_TRACER 1
 
 using namespace lbcrypto;
 
@@ -91,5 +93,8 @@ int main() {
 
     std::cout << "Result of encrypted computation of (1 AND 1) OR (1 AND (NOT 1)) = " << result << std::endl;
 
+    
+    FHETracer::getInstance().dumpToJson("unified_fhe_trace.json");
+    
     return 0;
 }

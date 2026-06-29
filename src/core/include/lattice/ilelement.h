@@ -446,7 +446,21 @@ public:
    */
     inline void SetFormat(const Format format) {
         if (this->GetFormat() != format) {
-            this->SwitchFormat();
+
+            uint32_t N = this->GetLength(); 
+
+            if (format == Format::EVALUATION) {
+                // 從 COEFFICIENT 轉到 EVALUATION -> 這是 NTT
+                TraceTimer timer("CORE", "MATH", "NTT", N, 1);
+                this->SwitchFormat();
+                // timer 離開這個 if 區塊時會自動銷毀並記錄時間！
+            } 
+            else if (format == Format::COEFFICIENT) {
+                // 從 EVALUATION 轉到 COEFFICIENT -> 這是 iNTT
+                TraceTimer timer("CORE", "MATH", "iNTT", N, 1);
+                this->SwitchFormat();
+                // timer 離開這個 if 區塊時會自動銷毀並記錄時間！
+            }
         }
     }
 };
